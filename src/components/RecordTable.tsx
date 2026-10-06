@@ -23,7 +23,29 @@ export function RecordTable({
       dataIndex: 'id',
       width: 120,
       fixed: 'left',
-      render: (value: string) => <Typography.Text code>{value}</Typography.Text>,
+      render: (value: string, record) => (
+        <Tooltip title={record.frozenVersion ? `已冻结于 ${record.frozenVersion}，不吸收后到更正` : '未冻结，可继续核对'}>
+          <Typography.Text code>
+            {value}
+            {record.frozenVersion ? ' 🔒' : ''}
+          </Typography.Text>
+        </Tooltip>
+      ),
+    },
+    {
+      title: '批次 / 版本',
+      key: 'batch',
+      width: 165,
+      render: (_: unknown, record) => (
+        <div className="batch-cell">
+          <Tooltip title={`并入历史：${record.batchHistory.join(' → ')}`}>
+            <Tag color={record.frozenVersion ? 'blue' : 'geekblue'} style={{ marginInlineEnd: 0 }}>
+              {record.batchNo}
+            </Tag>
+          </Tooltip>
+          <span className="muted-text">v{record.version}{record.frozenVersion ? ` · ${record.frozenVersion}` : ''}</span>
+        </div>
+      ),
     },
     {
       title: '来源',
@@ -112,7 +134,7 @@ export function RecordTable({
       columns={columns}
       dataSource={records}
       pagination={false}
-      scroll={{ x: 1850, y: height }}
+      scroll={{ x: 2010, y: height }}
       rowSelection={
         onSelectionChange
           ? {

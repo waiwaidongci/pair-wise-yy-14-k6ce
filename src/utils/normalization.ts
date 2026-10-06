@@ -1,5 +1,8 @@
 import type { BirdRecord, RingScheme, SpeciesRule } from '../types'
 
+/** 已入库但批次号缺失的数据统一回填到该初始批次 */
+export const INITIAL_BATCH_NO = 'B2026-S00-INIT'
+
 export const SPECIES_RULES: SpeciesRule[] = [
   {
     canonical: '鸿雁',

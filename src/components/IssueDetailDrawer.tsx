@@ -1,4 +1,4 @@
-import { CheckOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloseOutlined, EditOutlined, LockOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -8,6 +8,7 @@ import {
   Input,
   Space,
   Tag,
+  Timeline,
   Typography,
 } from 'antd'
 import { useEffect, useState } from 'react'
@@ -23,6 +24,11 @@ interface IssueDetailDrawerProps {
 }
 
 const severityLabels = { error: '错误', warning: '警告', review: '待确认' }
+const previousStatusLabels = {
+  accepted: '已接受',
+  returned: '已退回',
+  corrected: '已修正',
+}
 
 export function IssueDetailDrawer({
   issue,
@@ -42,6 +48,8 @@ export function IssueDetailDrawer({
 
   if (!issue || !record) return null
   const color = issue.severity === 'error' ? 'red' : issue.severity === 'warning' ? 'gold' : 'blue'
+  const frozen = Boolean(record.frozenVersion)
+  const readOnly = issue.status !== 'open' || frozen
 
   return (
     <Drawer
@@ -49,9 +57,14 @@ export function IssueDetailDrawer({
       open
       title="问题核验与处置"
       onClose={onClose}
-      extra={<Tag color={color}>{severityLabels[issue.severity]}</Tag>}
+      extra={
+        <Space size={4}>
+          {frozen && <Tag icon={<LockOutlined />} color="blue">已冻结 {record.frozenVersion}</Tag>}
+          <Tag color={color}>{severityLabels[issue.severity]}</Tag>
+        </Space>
+      }
       footer={
-        issue.status === 'open' ? (
+        !readOnly ? (
           <Space>
             <Button icon={<CloseOutlined />} onClick={() => reason.trim() && onReturn(reason)}>
               退回并说明
@@ -69,7 +82,15 @@ export function IssueDetailDrawer({
             </Button>
           </Space>
         ) : (
-          <Tag color="green">该问题已处置</Tag>
+          <Space>
+            <Tag color="green">
+              {frozen
+                ? '该记录已冻结进移交包，处置只读'
+                : issue.status === 'invalidated'
+                  ? '该问题依据已变化并失效'
+                  : '该问题已处置'}
+            </Tag>
+          </Space>
         )
       }
     >
@@ -79,6 +100,53 @@ export function IssueDetailDrawer({
         message={issue.title}
         description={issue.description}
       />
+      {issue.status === 'invalidated' && (
+        <Alert
+          showIcon
+          type="warning"
+          style={{ marginTop: 12 }}
+          message="判定依据变化，问题已失效"
+          description={
+            <Timeline
+              items={[
+                {
+                  color: 'gray',
+                  children: (
+                    <>
+                      失效时间：{issue.invalidatedAt ? new Date(issue.invalidatedAt).toLocaleString('zh-CN') : '-'}
+                      <br />
+                      {issue.invalidatedReason}
+                    </>
+                  ),
+                },
+                ...(issue.previousStatus
+                  ? [
+                      {
+                        color: 'gold' as const,
+                        children: `坐标/依据变化前的人工结论：${previousStatusLabels[issue.previousStatus]}（该结论未被冲掉，随原问题留痕）`,
+                      },
+                    ]
+                  : []),
+                ...(issue.supersededBy
+                  ? [
+                      {
+                        color: 'blue' as const,
+                        children: `按新值重新确认后由新问题 ${issue.supersededBy} 接续。`,
+                      },
+                    ]
+                  : issue.status === 'invalidated'
+                    ? [
+                        {
+                          color: 'green' as const,
+                          children: '按新值复核后问题不再成立，无需重新打开。',
+                        },
+                      ]
+                    : []),
+              ]}
+            />
+          }
+        />
+      )}
       <Descriptions
         className="issue-descriptions"
         title="记录上下文"
@@ -86,6 +154,11 @@ export function IssueDetailDrawer({
         size="small"
         items={[
           { key: 'id', label: '记录编号', children: record.id },
+          {
+            key: 'batch',
+            label: '批次 / 版本',
+            children: `${issue.batchNo} · 记录 v${record.version}${record.frozenVersion ? ` · 冻结于 ${record.frozenVersion}` : ''}`,
+          },
           { key: 'source', label: '来源文件', children: record.sourceFile },
           { key: 'time', label: '观察时间', children: record.observedAt },
           { key: 'location', label: '观察地点', children: record.location },
@@ -106,6 +179,7 @@ export function IssueDetailDrawer({
           <Input.TextArea
             value={value}
             rows={3}
+            disabled={readOnly}
             onChange={(event) => setValue(event.target.value)}
             placeholder="输入经核实后的值"
           />
@@ -114,6 +188,7 @@ export function IssueDetailDrawer({
           <Input.TextArea
             value={reason}
             rows={2}
+            disabled={readOnly}
             onChange={(event) => setReason(event.target.value)}
             placeholder="例如：需要核对原始纸质登记表照片"
           />

@@ -121,6 +121,10 @@ button, input, textarea { font: inherit; }
 .toolbar-label { color: #48675d; font-size: 12px; font-weight: 600; }
 .filter-count { color: #738b83; font-size: 12px; }
 .suggested-value { color: #0e8069; font-weight: 600; }
+.batch-cell { display: inline-flex; flex-direction: column; gap: 2px; }
+.batch-cell .muted-text { margin-left: 0; font-size: 10px; }
+.frozen-banner { border-color: #c6dcff; background: #f0f6ff; }
+.frozen-banner .ant-card-body { padding: 10px 14px; color: #31507a; }
 .ring-code { color: #145d4e; letter-spacing: .02em; }
 .scientific-name { display: block; margin-top: 1px; color: #789088; font-size: 11px; }
 .coordinate-cell { color: #42645a; font-variant-numeric: tabular-nums; }

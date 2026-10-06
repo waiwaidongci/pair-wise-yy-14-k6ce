@@ -3,6 +3,8 @@ import {
   DownloadOutlined,
   ExportOutlined,
   FilterOutlined,
+  LinkOutlined,
+  LockOutlined,
   ReloadOutlined,
   RollbackOutlined,
   ToolOutlined,
@@ -18,11 +20,13 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   type MenuProps,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ISSUE_RULES } from '../data/mockRecords'
 import { filterIssues, useValidationStore } from '../stores/validationStore'
 import type { IssueSeverity, IssueStatus, ValidationIssue } from '../types'
@@ -40,13 +44,18 @@ const statusMeta: Record<IssueStatus, { label: string; color: string }> = {
   accepted: { label: '已接受', color: 'green' },
   returned: { label: '已退回', color: 'volcano' },
   corrected: { label: '已修正', color: 'cyan' },
+  invalidated: { label: '已失效待重认', color: 'default' },
 }
 
 export function ValidationPage() {
   const { message, modal } = AntdApp.useApp()
+  const navigate = useNavigate()
   const records = useValidationStore((state) => state.records)
   const issues = useValidationStore((state) => state.issues)
   const operations = useValidationStore((state) => state.operations)
+  const batches = useValidationStore((state) => state.batches)
+  const packages = useValidationStore((state) => state.packages)
+  const differences = useValidationStore((state) => state.differences)
   const selectedIssueIds = useValidationStore((state) => state.selectedIssueIds)
   const setSelectedIssueIds = useValidationStore((state) => state.setSelectedIssueIds)
   const batchFix = useValidationStore((state) => state.batchFix)
@@ -67,8 +76,12 @@ export function ValidationPage() {
     () => filterIssues(issues, { severity, status, type: issueType, keyword }),
     [issues, issueType, keyword, severity, status],
   )
+  const recordById = useMemo(() => new Map(records.map((record) => [record.id, record])), [records])
   const activeIssue = issues.find((issue) => issue.id === activeIssueId) ?? null
   const activeRecord = records.find((record) => record.id === activeIssue?.recordId) ?? null
+  const frozen = packages.length > 0
+  const canRollback = !frozen && operations.some((operation) => !operation.rolledBack)
+  const invalidatedCount = issues.filter((issue) => issue.status === 'invalidated').length
 
   const ruleItems: MenuProps['items'] = ISSUE_RULES.filter((rule) => rule.correctionMode === 'automatic').map((rule) => ({
     key: rule.type,
@@ -78,6 +91,11 @@ export function ValidationPage() {
   const runBatchFix = (type: string) => {
     const count = batchFix(type as ValidationIssue['type'])
     void message.success(count ? `已按规则修正 ${count} 条问题` : '当前没有可自动修正的问题')
+  }
+
+  const jumpToIssue = (issueId: string) => {
+    setStatus('all')
+    setActiveIssueId(issueId)
   }
 
   const columns: ColumnsType<ValidationIssue> = [
@@ -97,20 +115,46 @@ export function ValidationPage() {
     {
       title: '说明',
       dataIndex: 'description',
-      width: 360,
+      width: 340,
       ellipsis: true,
+      render: (value: string, record) => (
+        <div>
+          <div>{value}</div>
+          {record.status === 'invalidated' && record.invalidatedReason && (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              失效原因：{record.invalidatedReason}
+              {record.previousStatus === 'accepted' && '（原结论：已接受）'}
+              {record.previousStatus === 'returned' && '（原结论：已退回）'}
+            </Typography.Text>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: '批次/冻结',
+      key: 'batch',
+      width: 180,
+      render: (_: unknown, record) => {
+        const frozenVersion = recordById.get(record.recordId)?.frozenVersion
+        return (
+          <Space size={4} wrap>
+            <Tag style={{ marginInlineEnd: 0 }}>{record.batchNo}</Tag>
+            {frozenVersion && <Tag icon={<LockOutlined />} color="blue">{frozenVersion}</Tag>}
+          </Space>
+        )
+      },
     },
     {
       title: '当前值',
       dataIndex: 'currentValue',
-      width: 190,
+      width: 170,
       ellipsis: true,
       render: (value: string) => <Typography.Text code>{value || '空'}</Typography.Text>,
     },
     {
       title: '建议值',
       dataIndex: 'suggestedValue',
-      width: 190,
+      width: 170,
       ellipsis: true,
       render: (value: string) =>
         value ? <span className="suggested-value">{value}</span> : <Typography.Text type="secondary">需人工判定</Typography.Text>,
@@ -118,8 +162,30 @@ export function ValidationPage() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: 100,
-      render: (value: IssueStatus) => <Tag color={statusMeta[value].color}>{statusMeta[value].label}</Tag>,
+      width: 120,
+      render: (value: IssueStatus, record) => (
+        <Space direction="vertical" size={2}>
+          <Tag color={statusMeta[value].color}>{statusMeta[value].label}</Tag>
+          {record.reopenedFrom && (
+            <Typography.Link
+              type="secondary"
+              style={{ fontSize: 12 }}
+              onClick={() => jumpToIssue(record.reopenedFrom!)}
+            >
+              <LinkOutlined /> 接续旧问题
+            </Typography.Link>
+          )}
+          {record.supersededBy && (
+            <Typography.Link
+              type="secondary"
+              style={{ fontSize: 12 }}
+              onClick={() => jumpToIssue(record.supersededBy!)}
+            >
+              <LinkOutlined /> 已由新问题接续
+            </Typography.Link>
+          )}
+        </Space>
+      ),
     },
     {
       title: '操作',
@@ -137,6 +203,34 @@ export function ValidationPage() {
   return (
     <div className="page-stack">
       <StatsCards totalRecords={records.length} issues={issues} />
+      {invalidatedCount > 0 && status === 'open' && (
+        <Card size="small" className="frozen-banner" variant="borderless">
+          <Space>
+            <Tag color="default">{invalidatedCount} 条问题因坐标/鸟种更正已失效</Tag>
+            <span>坐标一改动，靠它判出的问题先失效再按新值重新确认；</span>
+            <Button size="small" type="link" onClick={() => setStatus('invalidated')}>
+              查看失效与接续情况
+            </Button>
+          </Space>
+        </Card>
+      )}
+      {frozen && (
+        <Card size="small" className="frozen-banner" variant="borderless">
+          <Space>
+            <LockOutlined />
+            <span>
+              已有 {packages.length} 个冻结移交包；冻结记录与处置结论只读，后到更正请在
+              <Typography.Link strong onClick={() => navigate('/batches')}>
+                「批次核对」
+              </Typography.Link>
+              中按待核对差异处理。
+            </span>
+            {differences.some((diff) => diff.status === 'pending') && (
+              <Tag color="volcano">{differences.filter((d) => d.status === 'pending').length} 条差异待核对</Tag>
+            )}
+          </Space>
+        </Card>
+      )}
       <Card className="tool-card" variant="borderless">
         <div className="toolbar-row">
           <Space wrap>
@@ -151,7 +245,7 @@ export function ValidationPage() {
             />
             <Select
               value={status}
-              style={{ width: 128 }}
+              style={{ width: 150 }}
               onChange={setStatus}
               options={[
                 { value: 'all', label: '全部状态' },
@@ -180,7 +274,7 @@ export function ValidationPage() {
             <Button icon={<ReloadOutlined />} onClick={() => {
               modal.confirm({
                 title: '重新载入内置数据？',
-                content: '当前处置和操作历史将被清空。',
+                content: '当前处置、补交批次、冻结包和操作历史将被清空。',
                 okText: '重新载入',
                 onOk: reset,
               })
@@ -221,27 +315,29 @@ export function ValidationPage() {
                   { key: 'json', label: '区域中心 JSON', icon: <ExportOutlined /> },
                 ],
                 onClick: ({ key }) => {
-                  if (key === 'csv') exportRecordsCsv(records, issues)
-                  else exportTransferJson(records, issues, operations)
-                  void message.success('移交文件已生成')
+                  if (key === 'csv') exportRecordsCsv(records, issues, differences)
+                  else exportTransferJson(records, issues, operations, batches, packages, differences)
+                  void message.success('移交文件已生成（含批次号、冻结版本与差异条数）')
                 },
               }}
             >
               <Button type="primary">导出移交数据</Button>
             </Dropdown>
-            <Button
-              icon={<RollbackOutlined />}
-              disabled={!operations.some((operation) => !operation.rolledBack)}
-              onClick={() => {
-                const target = operations.find((operation) => !operation.rolledBack)
-                if (target) {
-                  rollback(target.id)
-                  void message.success(`已回滚：${target.title}`)
-                }
-              }}
-            >
-              回滚最近操作
-            </Button>
+            <Tooltip title={frozen ? '存在冻结移交包，处置历史已进入审计链路，不可回滚' : '回滚最近一次操作'}>
+              <Button
+                icon={<RollbackOutlined />}
+                disabled={!canRollback}
+                onClick={() => {
+                  const target = operations.find((operation) => !operation.rolledBack)
+                  if (target) {
+                    rollback(target.id)
+                    void message.success(`已回滚：${target.title}`)
+                  }
+                }}
+              >
+                回滚最近操作
+              </Button>
+            </Tooltip>
           </Space>
         </div>
       </Card>
@@ -254,11 +350,16 @@ export function ValidationPage() {
           columns={columns}
           dataSource={filtered}
           pagination={false}
-          scroll={{ x: 1400, y: 480 }}
+          scroll={{ x: 1500, y: 480 }}
           rowSelection={{
             selectedRowKeys: selectedIssueIds,
             onChange: (keys) => setSelectedIssueIds(keys.map(String)),
             preserveSelectedRowKeys: true,
+            getCheckboxProps: (record) => ({
+              disabled:
+                record.status !== 'open' ||
+                Boolean(recordById.get(record.recordId)?.frozenVersion),
+            }),
           }}
           onRow={(record) => ({
             onDoubleClick: () => setActiveIssueId(record.id),

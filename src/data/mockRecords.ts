@@ -1,5 +1,5 @@
 import type { BirdRecord, IssueRule } from '../types'
-import { haversineDistance, normalizeRecord, normalizeRingCode, normalizeSpecies } from '../utils/normalization'
+import { haversineDistance, INITIAL_BATCH_NO, normalizeRecord, normalizeRingCode, normalizeSpecies } from '../utils/normalization'
 
 export const ISSUE_RULES: IssueRule[] = [
   {
@@ -161,6 +161,11 @@ export function createMockRecords(count = 4200): BirdRecord[] {
       id: `REC-${String(index + 1).padStart(6, '0')}`,
       source: SOURCES[sourceIndex],
       sourceFile: `${year}_${SOURCES[sourceIndex].slice(0, 2)}_${String(Math.floor(index / 180) + 1).padStart(2, '0')}.xlsx`,
+      // 已有数据批次号缺失，统一回填为初始批次
+      batchNo: INITIAL_BATCH_NO,
+      version: 1,
+      frozenVersion: '',
+      batchHistory: [INITIAL_BATCH_NO],
       rawRingCode: createRing(ringIndex, ringYear),
       normalizedRingCode: '',
       ringScheme: '',

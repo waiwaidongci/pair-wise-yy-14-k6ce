@@ -3,6 +3,7 @@ import {
   CloseCircleOutlined,
   ExclamationCircleOutlined,
   FileSearchOutlined,
+  SyncOutlined,
 } from '@ant-design/icons'
 import { Card, Progress } from 'antd'
 import type { ValidationIssue } from '../types'
@@ -14,8 +15,9 @@ interface StatsCardsProps {
 
 export function StatsCards({ totalRecords, issues }: StatsCardsProps) {
   const open = issues.filter((issue) => issue.status === 'open')
-  const resolved = issues.length - open.length
-  const completion = issues.length ? Math.round((resolved / issues.length) * 100) : 100
+  const invalidatedList = issues.filter((issue) => issue.status === 'invalidated')
+  const resolved = issues.length - open.length - invalidatedList.length
+  const completion = issues.length ? Math.round(((resolved + invalidatedList.length) / issues.length) * 100) : 100
   const cards = [
     {
       label: '合并记录',
@@ -63,8 +65,16 @@ export function StatsCards({ totalRecords, issues }: StatsCardsProps) {
           <Progress type="circle" percent={completion} size={58} strokeColor="#168f73" />
           <div>
             <span className="stat-card__label">本轮处理进度</span>
-            <strong className="stat-card__value">{resolved.toLocaleString()}</strong>
-            <small>已接受、退回或修正</small>
+            <strong className="stat-card__value">{(resolved + invalidatedList.length).toLocaleString()}</strong>
+            <small>
+              已接受、退回或修正
+              {invalidatedList.length > 0 && (
+                <>
+                  {' · '}
+                  <SyncOutlined spin={false} /> {invalidatedList.length} 条因依据变化失效待重认
+                </>
+              )}
+            </small>
           </div>
         </div>
       </Card>
