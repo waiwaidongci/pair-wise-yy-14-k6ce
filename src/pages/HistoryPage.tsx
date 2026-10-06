@@ -8,6 +8,9 @@ const actionLabels = {
   return: { label: '退回', color: 'volcano' },
   manual_edit: { label: '人工编辑', color: 'blue' },
   reset: { label: '重置', color: 'default' },
+  freeze: { label: '冻结移交包', color: 'geekblue' },
+  supplement: { label: '补交更正', color: 'purple' },
+  diff_resolve: { label: '差异核对', color: 'gold' },
 }
 
 export function HistoryPage() {

@@ -145,6 +145,16 @@ button, input, textarea { font: inherit; }
 .species-rule em { display: block; margin: 3px 0 8px; color: #718a82; font-size: 12px; }
 .species-rule .ant-tag { margin-bottom: 4px; }
 
+.batch-stat-card { border: 1px solid #e0eae6; box-shadow: 0 8px 24px rgba(24,65,53,.04); }
+.batch-stat-card .ant-card-body { padding: 16px 18px; }
+.batch-stat-hint { display: block; margin-top: 6px; font-size: 11px; }
+.package-row { padding: 8px 10px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: .15s ease; }
+.package-row:hover { background: #f4f8f6; }
+.package-row--active { border-color: #35a782; background: #f1f7f5; }
+.package-note { margin-top: 6px; color: #71877f; font-size: 12px; }
+.diff-filter-tag { cursor: pointer; }
+.frozen-alert { margin-bottom: 14px; }
+
 @media (max-width: 1400px) {
   .stats-grid { grid-template-columns: repeat(4, minmax(145px, 1fr)); }
   .stats-grid .stat-card--progress { grid-column: span 4; }

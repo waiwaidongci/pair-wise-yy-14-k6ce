@@ -2,14 +2,17 @@ import {
   AuditOutlined,
   CheckSquareOutlined,
   DatabaseOutlined,
+  FileProtectOutlined,
   HistoryOutlined,
 } from '@ant-design/icons'
 import { Layout, Tag } from 'antd'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useValidationStore } from './stores/validationStore'
 
 const NAV_ITEMS = [
   { path: '/validation', label: '问题校验', icon: <CheckSquareOutlined /> },
   { path: '/records', label: '合并记录', icon: <DatabaseOutlined /> },
+  { path: '/batches', label: '移交批次', icon: <FileProtectOutlined /> },
   { path: '/history', label: '操作历史', icon: <HistoryOutlined /> },
   { path: '/rules', label: '规则词典', icon: <AuditOutlined /> },
 ]
@@ -17,6 +20,10 @@ const NAV_ITEMS = [
 export function App() {
   const location = useLocation()
   const current = NAV_ITEMS.find((item) => location.pathname.startsWith(item.path))
+  const batches = useValidationStore((state) => state.batches)
+  const packages = useValidationStore((state) => state.packages)
+  const currentBatch = batches[batches.length - 1]
+  const frozenVersion = packages[0]?.version ?? null
   return (
     <Layout className="app-shell">
       <Layout.Sider width={226} className="app-sider">
@@ -42,8 +49,10 @@ export function App() {
         <div className="transfer-card">
           <span className="transfer-card__status" />
           <div>
-            <strong>2026 春季移交批次</strong>
-            <span>华东区域环志中心</span>
+            <strong>{currentBatch?.id ?? '未命名批次'}</strong>
+            <span>
+              {frozenVersion ? `已冻结 v${frozenVersion}` : '未冻结'} · 华东区域环志中心
+            </span>
           </div>
         </div>
         <div className="sider-footer">

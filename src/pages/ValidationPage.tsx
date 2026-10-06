@@ -47,6 +47,8 @@ export function ValidationPage() {
   const records = useValidationStore((state) => state.records)
   const issues = useValidationStore((state) => state.issues)
   const operations = useValidationStore((state) => state.operations)
+  const packages = useValidationStore((state) => state.packages)
+  const batches = useValidationStore((state) => state.batches)
   const selectedIssueIds = useValidationStore((state) => state.selectedIssueIds)
   const setSelectedIssueIds = useValidationStore((state) => state.setSelectedIssueIds)
   const batchFix = useValidationStore((state) => state.batchFix)
@@ -211,7 +213,7 @@ export function ValidationPage() {
             </Button>
           </Space>
           <Space>
-            <Button icon={<DownloadOutlined />} onClick={() => exportValidationCsv(issues, records)}>
+            <Button icon={<DownloadOutlined />} onClick={() => exportValidationCsv(issues, records, packages)}>
               导出问题 CSV
             </Button>
             <Dropdown
@@ -221,8 +223,8 @@ export function ValidationPage() {
                   { key: 'json', label: '区域中心 JSON', icon: <ExportOutlined /> },
                 ],
                 onClick: ({ key }) => {
-                  if (key === 'csv') exportRecordsCsv(records, issues)
-                  else exportTransferJson(records, issues, operations)
+                  if (key === 'csv') exportRecordsCsv(records, issues, packages)
+                  else exportTransferJson(records, issues, operations, packages, batches)
                   void message.success('移交文件已生成')
                 },
               }}

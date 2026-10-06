@@ -1,4 +1,4 @@
-import type { BirdRecord, IssueSeverity, ValidationIssue } from '../types'
+import type { BirdRecord, IssueSeverity, IssueStatus, IssueType, ValidationIssue } from '../types'
 import { getLocationDistance } from '../data/mockRecords'
 import { normalizeRingCode, parseCoordinate } from './normalization'
 
@@ -6,6 +6,32 @@ const SEVERITY_ORDER: Record<IssueSeverity, number> = {
   error: 0,
   warning: 1,
   review: 2,
+}
+
+function issueBasis(type: IssueType, record: BirdRecord, previous?: BirdRecord): string {
+  switch (type) {
+    case 'ring_invalid':
+      return `rawRingCode=${record.rawRingCode}`
+    case 'ring_duplicate':
+      return `normalizedRingCode=${record.normalizedRingCode}`
+    case 'species_alias':
+    case 'species_unknown':
+      return `speciesRaw=${record.speciesRaw}`
+    case 'coordinate_invalid':
+      return `latitudeRaw=${record.latitudeRaw}|longitudeRaw=${record.longitudeRaw}`
+    case 'location_jump':
+      return [
+        `lat=${record.latitude}`,
+        `lng=${record.longitude}`,
+        `observedAt=${record.observedAt}`,
+        `prevRing=${previous?.normalizedRingCode ?? ''}`,
+        `prevLat=${previous?.latitude ?? ''}`,
+        `prevLng=${previous?.longitude ?? ''}`,
+        `prevObservedAt=${previous?.observedAt ?? ''}`,
+      ].join('|')
+    default:
+      return ''
+  }
 }
 
 export function validateRecords(records: BirdRecord[]): ValidationIssue[] {
@@ -34,6 +60,7 @@ export function validateRecords(records: BirdRecord[]): ValidationIssue[] {
         currentValue: record.rawRingCode,
         suggestedValue: `${ring.normalizedPrefix || 'CN'}-${new Date(record.observedAt).getFullYear()}-${String((index + 1) % 99999).padStart(5, '0')}`,
         suggestion: '根据来源文件年份和原序列尾号补齐标准方案前缀。',
+        basis: issueBasis('ring_invalid', record),
         status: 'open',
         detectedAt,
       })
@@ -56,6 +83,7 @@ export function validateRecords(records: BirdRecord[]): ValidationIssue[] {
             currentValue: record.normalizedRingCode,
             suggestedValue: `${ring.normalizedPrefix}-${record.observedAt.slice(0, 4)}-${String((Number(ring.serial) + 710) % 99999).padStart(5, '0')}`,
             suggestion: '核对原环照片或捕获登记表；确认非重捕记录后更换序列号。',
+            basis: issueBasis('ring_duplicate', record),
             status: 'open',
             detectedAt,
           })
@@ -65,10 +93,11 @@ export function validateRecords(records: BirdRecord[]): ValidationIssue[] {
 
     if (record.scientificName === '待鉴定' || record.speciesCanonical !== record.speciesRaw) {
       const automatic = record.scientificName !== '待鉴定'
+      const speciesType: IssueType = automatic ? 'species_alias' : 'species_unknown'
       issues.push({
         id: `issue-species-${record.id}`,
         recordId: record.id,
-        type: automatic ? 'species_alias' : 'species_unknown',
+        type: speciesType,
         severity: automatic ? 'warning' : 'review',
         title: automatic ? '鸟种使用同义名或俗名' : '鸟种待分类',
         description: automatic
@@ -80,6 +109,7 @@ export function validateRecords(records: BirdRecord[]): ValidationIssue[] {
         suggestion: automatic
           ? `采用规范中文名与学名 ${record.scientificName}。`
           : '请由鉴定人员补充物种或注明仅鉴定至属/科。',
+        basis: issueBasis(speciesType, record),
         status: 'open',
         detectedAt,
       })
@@ -100,6 +130,7 @@ export function validateRecords(records: BirdRecord[]): ValidationIssue[] {
         currentValue: `${record.latitudeRaw} / ${record.longitudeRaw}`,
         suggestedValue: '',
         suggestion: '根据地点主表补齐十进制度数或标准度分秒格式。',
+        basis: issueBasis('coordinate_invalid', record),
         status: 'open',
         detectedAt,
       })
@@ -127,6 +158,7 @@ export function validateRecords(records: BirdRecord[]): ValidationIssue[] {
           currentValue: record.location,
           suggestedValue: previous.location,
           suggestion: '核对观察日期、地点和环号；若为回收记录需补充运输或救助信息。',
+          basis: issueBasis('location_jump', record, previous),
           status: 'open',
           detectedAt,
         })
@@ -135,6 +167,45 @@ export function validateRecords(records: BirdRecord[]): ValidationIssue[] {
   })
 
   return issues.sort((a, b) => {
+    const severity = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
+    return severity || a.recordId.localeCompare(b.recordId)
+  })
+}
+
+/**
+ * 按最新记录重新校验，并把人工处置结论接到新数据上：
+ * - 判定依据（basis）未变的问题，保留已接受/已退回/已修正结论；
+ * - 判定依据发生变化（如坐标被更正）的问题，先失效（回到待处理），再按新值重新确认；
+ * - 重新校验后不再出现的问题：已修正的留档，待处理的视为已随更正闭合，已接受/退回的不再挂出（处置历史仍在）。
+ */
+export function revalidateRecords(
+  records: BirdRecord[],
+  prevIssues: ValidationIssue[],
+): ValidationIssue[] {
+  const fresh = validateRecords(records)
+  const prevById = new Map(prevIssues.map((issue) => [issue.id, issue]))
+  const freshIds = new Set(fresh.map((issue) => issue.id))
+  const result: ValidationIssue[] = []
+
+  for (const issue of fresh) {
+    const prev = prevById.get(issue.id)
+    if (prev && prev.status !== 'open' && prev.basis === issue.basis) {
+      result.push({ ...issue, status: prev.status, returnReason: prev.returnReason })
+    } else {
+      result.push(issue)
+    }
+  }
+
+  for (const prev of prevIssues) {
+    if (freshIds.has(prev.id)) continue
+    if (prev.status === 'corrected') {
+      result.push(prev)
+    } else if (prev.status === 'open') {
+      result.push({ ...prev, status: 'corrected' as IssueStatus })
+    }
+  }
+
+  return result.sort((a, b) => {
     const severity = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
     return severity || a.recordId.localeCompare(b.recordId)
   })

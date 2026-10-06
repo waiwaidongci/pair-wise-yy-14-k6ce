@@ -9,6 +9,7 @@ export function RecordsPage() {
   const { message } = AntdApp.useApp()
   const records = useValidationStore((state) => state.records)
   const issues = useValidationStore((state) => state.issues)
+  const packages = useValidationStore((state) => state.packages)
   const [keyword, setKeyword] = useState('')
   const [source, setSource] = useState('all')
   const [species, setSpecies] = useState('all')
@@ -49,7 +50,7 @@ export function RecordsPage() {
           </Typography.Paragraph>
         </div>
         <Button icon={<DownloadOutlined />} onClick={() => {
-          exportRecordsCsv(filtered, issues)
+          exportRecordsCsv(filtered, issues, packages)
           void message.success(`已导出当前筛选结果 ${filtered.length.toLocaleString()} 条`)
         }}>
           导出当前结果

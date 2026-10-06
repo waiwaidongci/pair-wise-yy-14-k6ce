@@ -42,6 +42,7 @@ export function IssueDetailDrawer({
 
   if (!issue || !record) return null
   const color = issue.severity === 'error' ? 'red' : issue.severity === 'warning' ? 'gold' : 'blue'
+  const frozen = record.frozenVersion !== null
 
   return (
     <Drawer
@@ -62,7 +63,7 @@ export function IssueDetailDrawer({
             <Button
               type="primary"
               icon={<EditOutlined />}
-              disabled={!value.trim()}
+              disabled={frozen || !value.trim()}
               onClick={() => onSave(value.trim(), reason.trim())}
             >
               保存修正
@@ -73,6 +74,15 @@ export function IssueDetailDrawer({
         )
       }
     >
+      {frozen && (
+        <Alert
+          showIcon
+          type="warning"
+          className="frozen-alert"
+          message={`记录已冻结于 v${record.frozenVersion}，不吸收后到更正`}
+          description="如需更正，请在“移交批次”页登记为待核对差异；确认后的差异会计入下一冻结版本。"
+        />
+      )}
       <Alert
         showIcon
         type={issue.severity === 'error' ? 'error' : issue.severity === 'warning' ? 'warning' : 'info'}

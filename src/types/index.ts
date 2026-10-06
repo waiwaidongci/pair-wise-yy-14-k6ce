@@ -8,6 +8,43 @@ export type IssueType =
   | 'coordinate_invalid'
   | 'location_jump'
 
+export type BatchKind = 'initial' | 'supplement' | 'correction'
+
+export interface Batch {
+  id: string
+  label: string
+  kind: BatchKind
+  source: string
+  receivedAt: string
+  note: string
+}
+
+export type DiffStatus = 'pending' | 'accepted' | 'rejected'
+
+export interface RecordDiff {
+  id: string
+  recordId: string
+  field: string
+  fieldLabel: string
+  frozenValue: string
+  incomingValue: string
+  status: DiffStatus
+  detectedAt: string
+}
+
+export interface HandoverPackage {
+  id: string
+  version: number
+  batchId: string
+  batchLabel: string
+  frozenAt: string
+  recordCount: number
+  records: BirdRecord[]
+  issues: ValidationIssue[]
+  diffs: RecordDiff[]
+  note: string
+}
+
 export interface SpeciesRule {
   canonical: string
   scientificName: string
@@ -37,6 +74,8 @@ export interface BirdRecord {
   longitudeRaw: string
   latitude: number | null
   longitude: number | null
+  batchId: string
+  frozenVersion: number | null
   recorder: string
   ageCode: string
   sex: string
@@ -56,17 +95,20 @@ export interface ValidationIssue {
   suggestion: string
   status: IssueStatus
   returnReason?: string
+  basis: string
   detectedAt: string
 }
 
 export interface OperationSnapshot {
   records: BirdRecord[]
   issues: ValidationIssue[]
+  packages?: HandoverPackage[]
+  batches?: Batch[]
 }
 
 export interface OperationLog {
   id: string
-  action: 'batch_fix' | 'accept' | 'return' | 'manual_edit' | 'reset'
+  action: 'batch_fix' | 'accept' | 'return' | 'manual_edit' | 'reset' | 'freeze' | 'supplement' | 'diff_resolve'
   title: string
   detail: string
   count: number

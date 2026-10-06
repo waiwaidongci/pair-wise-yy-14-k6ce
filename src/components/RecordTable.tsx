@@ -94,6 +94,20 @@ export function RecordTable({
         ),
     },
     { title: '环志员', dataIndex: 'recorder', width: 100 },
+    {
+      title: '批次号',
+      dataIndex: 'batchId',
+      width: 150,
+      ellipsis: true,
+      render: (value: string) => <Typography.Text code>{value || 'PC-2026-INITIAL'}</Typography.Text>,
+    },
+    {
+      title: '冻结版本',
+      dataIndex: 'frozenVersion',
+      width: 90,
+      render: (value: number | null) =>
+        value ? <Tag color="blue">v{value}</Tag> : <Typography.Text type="secondary">未冻结</Typography.Text>,
+    },
     ...(compact
       ? []
       : [

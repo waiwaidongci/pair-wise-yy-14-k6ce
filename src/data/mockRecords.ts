@@ -1,4 +1,5 @@
 import type { BirdRecord, IssueRule } from '../types'
+import { INITIAL_BATCH_ID } from '../utils/batches'
 import { haversineDistance, normalizeRecord, normalizeRingCode, normalizeSpecies } from '../utils/normalization'
 
 export const ISSUE_RULES: IssueRule[] = [
@@ -47,7 +48,7 @@ export const ISSUE_RULES: IssueRule[] = [
 ]
 
 const SOURCES = ['北戴河春季环志队', '崇明东滩监测站', '鄱阳湖巡护队', '湛江红树林站', '云南会泽夜栖调查']
-const LOCATIONS = [
+export const LOCATIONS = [
   { name: '北戴河湿地', latitude: 39.83, longitude: 119.52 },
   { name: '崇明东滩', latitude: 31.53, longitude: 121.95 },
   { name: '鄱阳湖吴城', latitude: 29.18, longitude: 116.01 },
@@ -173,6 +174,8 @@ export function createMockRecords(count = 4200): BirdRecord[] {
       longitudeRaw: index % 1249 === 0 ? '--' : longitudeRaw,
       latitude: null,
       longitude: null,
+      batchId: INITIAL_BATCH_ID,
+      frozenVersion: null,
       recorder: RECORDERS[(index * 5) % RECORDERS.length],
       ageCode: AGES[(index * 3) % AGES.length],
       sex: SEXES[(index * 7) % SEXES.length],

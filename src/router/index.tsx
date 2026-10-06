@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { App } from '../App'
+import { BatchesPage } from '../pages/BatchesPage'
 import { HistoryPage } from '../pages/HistoryPage'
 import { RecordsPage } from '../pages/RecordsPage'
 import { RulesPage } from '../pages/RulesPage'
@@ -13,6 +14,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate replace to="/validation" /> },
       { path: 'validation', element: <ValidationPage /> },
       { path: 'records', element: <RecordsPage /> },
+      { path: 'batches', element: <BatchesPage /> },
       { path: 'history', element: <HistoryPage /> },
       { path: 'rules', element: <RulesPage /> },
     ],
